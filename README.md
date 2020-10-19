@@ -4,7 +4,7 @@ Examine commonalities between domains (perception, attention and value) using re
 ## Code description:
 ### Analyze_behavior:
 Exploration analysis of the behavior data.
-•	Looking specifically at the tasks: Mars contrast (visual task), Flanker task (a higher perceptual task, selective attention), and Delay discount (a value-based task)./
+•	Looking specifically at the tasks: Mars contrast (visual task), Flanker task (a higher perceptual task, selective attention), and Delay discount (a value-based task).<br />
 •	Z-scoring of the scores for these tasks in order to relate between the performances in them
 
 ### PreProcessingRSdata:
