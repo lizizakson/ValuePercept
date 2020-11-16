@@ -79,6 +79,6 @@ def concat(dir_path, sessions, file_name,saved_dir_path):
         #save file of subject to the directory
         np.savez_compressed(saved_dir_path + sub, a = data_sub)
         #delete original subject file
-        shutil.rmtree(dir_path + '/' + sub, ignore_errors=False, onerror=None) 
+        #shutil.rmtree(dir_path + '/' + sub, ignore_errors=False, onerror=None) 
         #break
     #data
