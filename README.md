@@ -1,6 +1,6 @@
 # ValuePercept
 Examine commonalities between domains (perception, attention and value) using resting state activity.
-OSF link:(https://osf.io/bgcxd/)
+OSF link: https://osf.io/bgcxd/
 
 ## Code description:
 ### Analyze_behavior:
