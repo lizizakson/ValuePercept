@@ -65,3 +65,33 @@ def equalize(X_features, df, subject_IDs):
     print("So, the difference between the two data sets is {0}".format(len(subjectDifference)))
 
     return X_features, df, subject_IDs
+
+
+def vectorize_mat(X_features, subject_IDs):
+    """
+    Produce vectorized_correlation = reduce the matrix to half and discrad diagonal - for all subjects
+
+    input: x_features (a numpy array which contains the x_features of all subjects), subject_IDs (a list of the subjects in the fMRI data)
+    output: vectorized mats in the form of pandas df, each row contains the identity of this specific edge
+    """
+    num_nodes = X_features.shape[1] # num_nodes (integer with the number of nodes of the matrices)
+
+    vectorized_edges = {}
+    for node1 in range(num_nodes):
+        for node2 in range(node1+1,num_nodes):
+            vectorized_edges[(node1,node2)] = []
+            for i in range(len(X_features)):
+                vectorized_edges[(node1,node2)].append(X_features[i][node1,node2]) #append the edge of this specific pair of nodes
+
+    print("The number of vectorized edges is {0}".format(len(vectorized_edges)))
+    print("Make sure it equals num_nodes*(num_nodes-1)/2")
+
+    #first display: rows are the edges identity and columns are subject IDs
+    vectorized_edges = pd.DataFrame.from_dict(vectorized_edges, orient='index', columns = subject_IDs)
+
+    #second display: transpose the data frame so that the subjects would be the rows and the edges identity the columns
+    vectorized_edges = vectorized_edges.transpose()
+    print(vectorized_edges.head(5)) #print this display
+
+    return vectorized_edges
+
