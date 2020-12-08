@@ -20,6 +20,7 @@ from nilearn.connectome import ConnectivityMeasure
 from nilearn.decomposition import DictLearning, CanICA
 from scipy.stats import pearsonr
 import nilearn.plotting as plotting
+import math
 
 import hcp_utils as hcp
 
@@ -70,6 +71,7 @@ def concat(dir_path, sessions, file_name,saved_dir_path):
             X = img.get_fdata()
             if X.shape[0] != 1200: #validate that each run is 1200 time points
                 print("bad subject")
+            #Xn = X - np.mean(X) #remove the mean image (?)
             Xn = hcp.normalize(X) #normalize data per session
             tmp_dict[session] = Xn
         #Concatenate 4 normalized sessions per subject
@@ -82,3 +84,65 @@ def concat(dir_path, sessions, file_name,saved_dir_path):
         #shutil.rmtree(dir_path + '/' + sub, ignore_errors=False, onerror=None) 
         #break
     #data
+
+
+def medial_mask(data, medial_mask):
+    """
+    This function gets rsfMRI data file (numpy array) and a mask file (mat file that was converted to array), and produces data file with the medial mask inserted into it (numpy array).
+
+    input: data of rsfMRI per subject, medial mask (1: 59412 cortical vertices- same as HCP data, 0: 5572 medial vertices that have to be inserted into the HCP data)
+    output: HCP data with 59412 cortical vertices and 5572 new medial vertices as NaNs inserted into it
+    """
+    #Take the first 59412 vertices from the HCP data. These are the cortical vertices (the Shafer parcellation doesn't include subcortical areas)
+    data_forparc = data[:,0:59412] #0-59411 (the last element is excluded)
+
+    #indices in which the nans should be inserted into
+    result = np.where(medial_mask == 0)
+    idx = list(result[0])
+
+    #fix the indices such that the insertion would be correct (substruct the index's position from each index)
+    for i in range(len(idx)):
+        idx[i] = idx[i] - i
+
+    #insert NaNs into the indices of the HCP data according to the medial_mask
+    idx = tuple(idx)
+    data_forparc = np.insert(data_forparc, idx, np.nan, axis =1)
+    print(data_forparc.shape)
+
+    #Validate the output
+    idx_correct = list(result[0])
+    for i in idx_correct:
+        if not math.isnan(data_forparc[0,i]):
+            print("problem")
+
+    return data_forparc
+
+
+
+def schaefer_parc(data_forparc, parc):
+    """
+    This function gets rsfMRI data file (numpy array) and a parcellation file (dscalar/dlabel), and produces parcellated data (numpy array).
+
+    input: data of rsfMRI per subject, parcellation file
+    output: parcellated data (in the shape: num of time points, num of parcels)
+    """
+    #path = "/mnt/c/Users/liz/Contacts/Desktop/ValuePercept/Parcellations/Parcellations/HCP/fslr32k/cifti/Schaefer2018_100Parcels_7Networks_order.dlabel.nii"
+    #img = nib.load(path)
+    #parc = img.get_fdata()
+    parc = parc.astype(int) #Convert parcel numbers from float to integer
+
+    #insert the parellation numbers as column names to the data
+    data_forparc = pd.DataFrame(data=data_forparc, columns=parc[0])
+    
+    #Initialize the parc_ts (=parcellated data)
+    shape = (data_forparc.shape[0], max(np.unique(parc))) #4800,100
+    parc_ts = np.zeros(shape)
+    
+    #Average across the same parcell (e.g. all the columns(vertices) who belong to parcel 1) for each row (time point)
+    #Start from 1, since 0 is has no maening in this parcellation
+    for i in range(1,max(np.unique(parc))+1): #1-101, last elemnt is excluded in python
+        parc_ts[:, i-1] = data_forparc[i].mean(axis=1) #i-1 so it will fit into 0-99 columns in the numpy array output
+
+    print(parc_ts.shape)
+
+    return parc_ts
