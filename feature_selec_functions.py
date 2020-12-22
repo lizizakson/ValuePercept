@@ -23,6 +23,23 @@ import nilearn.plotting as plotting
 
 import hcp_utils as hcp
 
+
+def ind_Pmaxelements(list1, n_features, P):
+
+    """
+    Helps in the feature selection step: 
+    input: a list of numbers (edges)
+    output: the threshold (the minimum maximum) according to a specified percentage of highest values
+    """
+    num = P*n_features
+    list_temp = list(map(abs, list1)) #convert all elements to absolute value
+
+    ind = np.argpartition(list_temp, -num)[-num:] #indices of P highest values
+    print(ind)
+     
+    return ind
+
+
 def Pmaxelements(list1, P):
 
     """
@@ -31,8 +48,10 @@ def Pmaxelements(list1, P):
     output: the threshold (the minimum maximum) according to a specified percentage of highest values
     """
     
+    #list1 = list1.flatten() #make sure the array is 1d
+
     list_temp = list(map(abs, list1)) #convert all elements to absolute value
-    
+   
     list_temp.sort(reverse = True) #sort the elements from the highest to the lowest element
     
     num_elements = int(len(list_temp)*P) #num of highest elements needed to be found according the % given
@@ -82,7 +101,8 @@ def select_features(train_vcts, train_behav, percent = 0.01, corr_type='pearson'
     mask_edges = [] #create new list to store the indices of the highest elements from the original list in
     #corr.abs() #convert the original list to abs values (not sorted)
     mask_edges = corr.abs() >= threshold
-    
+    print(corr[mask_edges == True])
+
     if verbose:
         print("Found ({}) edges positively/negatively correlated with behavior in the training set".format(len(mask_edges))) # for debugging
 
