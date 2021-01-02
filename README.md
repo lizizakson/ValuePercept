@@ -1,5 +1,5 @@
 # ValuePercept
-Examine commonalities between domains (perception, attention and value) using resting state activity.
+Examine commonalities between perceptual and value-based processes using functional connectivity data (taken from the [Human Connectome Project]( https://www.humanconnectome.org/study/hcp-young-adult/data-releases)).
 OSF link: https://osf.io/bgcxd/
 
 ## Code description:
