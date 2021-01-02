@@ -91,7 +91,7 @@ def vectorize_mat(X_features, subject_IDs):
 
     #second display: transpose the data frame so that the subjects would be the rows and the edges identity the columns
     vectorized_edges = vectorized_edges.transpose()
-    print(vectorized_edges.head(5)) #print this display
+    #print(vectorized_edges.head(5)) #print this display
 
     return vectorized_edges
 

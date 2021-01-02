@@ -24,6 +24,8 @@ import math
 
 from nilearn import connectome
 import hcp_utils as hcp
+import scipy.io as sio
+import conf
 
 def unzip(dir_path):
     """
@@ -87,7 +89,7 @@ def concat(dir_path, sessions, file_name,saved_dir_path):
     #data
 
 
-def medial_mask(data, medial_mask):
+def add_medial_mask(data, medial_mask):
     """
     This function gets rsfMRI data file (numpy array) and a mask file (mat file that was converted to array), and produces data file with the medial mask inserted into it (numpy array).
 
@@ -108,7 +110,7 @@ def medial_mask(data, medial_mask):
     #insert NaNs into the indices of the HCP data according to the medial_mask
     idx = tuple(idx)
     data_forparc = np.insert(data_forparc, idx, np.nan, axis =1)
-    print(data_forparc.shape)
+    #print(data_forparc.shape)
 
     #Validate the output
     idx_correct = list(result[0])
@@ -127,9 +129,6 @@ def schaefer_parc(data_forparc, parc):
     input: data of rsfMRI per subject, parcellation file
     output: parcellated data (in the shape: num of time points, num of parcels)
     """
-    #path = "/mnt/c/Users/liz/Contacts/Desktop/ValuePercept/Parcellations/Parcellations/HCP/fslr32k/cifti/Schaefer2018_100Parcels_7Networks_order.dlabel.nii"
-    #img = nib.load(path)
-    #parc = img.get_fdata()
     parc = parc.astype(int) #Convert parcel numbers from float to integer
 
     #insert the parellation numbers as column names to the data
@@ -144,7 +143,7 @@ def schaefer_parc(data_forparc, parc):
     for i in range(1,max(np.unique(parc))+1): #1-101, last elemnt is excluded in python
         parc_ts[:, i-1] = data_forparc[i].mean(axis=1) #i-1 so it will fit into 0-99 columns in the numpy array output
 
-    print(parc_ts.shape)
+    #print(parc_ts.shape)
 
     return parc_ts
 
@@ -161,11 +160,35 @@ def create_all_features(data, parc):
     #kind{“correlation”, “partial correlation”, “tangent”, “covariance”, “precision”}
     correlation_measure = connectome.ConnectivityMeasure(kind='correlation')
 
+    medial_mask = []
+    parc_shaf = []
+    if parc == "Schaefer":
+        #Add medial mask to HCP data (to equalize dimensions of HCP data and Schafer parcellation file)
+        file = conf.MEDIAL_MASK_PATH
+        mat_contents = sio.loadmat(file)
+        medial_mask = mat_contents['medial_mask']
+        print('The shape of the medial mask file is {}'.format(medial_mask.shape))
+        print("It should be (64984, 1).")
+        #Schafer parcellation
+        path_parc = conf.SCHAEFER_PARC_DIR + conf.SCHAEFER_PARC_FILE
+        img = nib.load(path_parc)
+        parc_shaf = img.get_fdata()
+        print('The shape of the parc file is {}'.format(parc_shaf.shape))
+
     for i,sub in enumerate(data):
         #load data
         load_data = np.load(data[i])['a']
-        # parcell the data according to a specific atlas
-        parcellated_data = (hcp.parcellate(load_data, parc))
+        parcellated_data = []
+        if parc == "Schaefer":
+            print("Shafer")
+            # add medial mask to the cortical vertices of the HCP data 
+            data_forparc = add_medial_mask(load_data, medial_mask) 
+            # parcell the data according to the schaefer parc
+            parcellated_data = schaefer_parc(data_forparc, parc_shaf)
+        else:
+            print("Not Shafer")
+            # parcell the data according to a specific atlas
+            parcellated_data = hcp.parcellate(load_data, parc)
         # create a region x region correlation matrix
         correlation_matrix = correlation_measure.fit_transform([parcellated_data])[0]
         # add to our container
