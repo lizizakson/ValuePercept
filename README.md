@@ -3,7 +3,7 @@ Examine commonalities between perceptual and value-based processes using functio
 OSF link: https://osf.io/bgcxd/
 
 ## Code description:
-###Congif file (in the code folder):
+### Congif file (in the code folder):
 Include all the directories and paths needed to run the code. Please change it according to your paths.
 ### Analyze_behavior (in the Behavior folder):
 Exploration analyses of the behavior data.<br />
@@ -24,6 +24,7 @@ Pre-processing of the resting state fMRI data.<br />
 •	Then, create a connectome for each subject: measures the connection between each ROI.<br />
 •	For example: if the parcellation is 7 regions of interest, then the connectome would be a 7X7 matrix.<br />
 •	Save the matrices, so they can be used in the model code.<br />
+•	Note, the parcellation function uses the [hcp_utils package](https://pypi.org/project/hcp-utils/). Thus, the parcellations that are available are the ones that were implemented by this package with exception to the Schaefer parcellation.
 
 ### Model_perceptValue:
 Initial code for a CPM model- connectome predictive modeling.<br />
