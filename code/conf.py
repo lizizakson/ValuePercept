@@ -22,4 +22,4 @@ SUB_ID_FILENAME = 'subID_992.txt'
 BEHAVIOR_PATH = 'Behavior/HCP_behavior_includeZscores_V2.csv'
 
 #These paths are for the Plot Results step (required to have the Model outputs):
-RESULTS_DIR = '/mnt/c/Users/liz/Contacts/Desktop/ValuePercept/results'
+RESULTS_DIR = '/mnt/c/Users/liz/Contacts/Desktop/ValuePercept/results/'

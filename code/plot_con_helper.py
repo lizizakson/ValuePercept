@@ -32,6 +32,47 @@ from mne.connectivity import spectral_connectivity
 from mne.viz import circular_layout, plot_connectivity_circle
 
 
+def sync_specific_df(df_dict, df_key):
+    """
+    Helps to the equalize_parc function:
+    For every df, checks if all pair of nodes that exist in both tasks exist in the df. 
+    if not, append it to the df with a beta of np.nan.
+    input: a dict of dfs, and a specific key (=specific df)
+    output: the specific df with equalized parcels (according to the other dfs in the dict)
+    """
+    df_res = df_dict[df_key]
+    for key in df_dict.keys(): #loop over all other dfs
+        if key == df_key:
+            continue
+
+        for i in range(df_dict[key].shape[0]): #loop over all pairs of parcels (nodes) in the other df
+            node1_val = df_dict[key].loc[i]['node1'] #specific value of node 1 according to a row number
+            node2_val = df_dict[key].loc[i]['node2']
+            #Searches if this pair exists in the specific df we are looking at
+            res_tmp = df_dict[df_key][(df_dict[df_key]['node1'] == node1_val) & (df_dict[df_key]['node2'] == node2_val)]
+            if res_tmp.shape[0] == 0: #this pair does not exist
+                df_res = df_res.append({'node1': node1_val, 'node2': node2_val, 'beta': np.nan}, ignore_index=True)
+
+    return df_res
+
+
+def equalize_parc(df_dict):
+    """
+    For every df, checks if all pair of nodes that exist in both tasks exist in the df. 
+    if not, append it to the df with a beta of np.nan.
+    input: a dict of all the dfs (each df contains: node1, node2, and beta)
+    output: a dict of all the dfs with equalized parcels
+    """
+    res_df_dict = {}
+
+    for key in df_dict.keys():
+        #print(key)
+        df = sync_specific_df(df_dict, key)
+        res_df_dict[key] = df
+    
+    return res_df_dict
+
+
 def unique(list1): 
     x = np.array(list1) 
     return list(np.unique(x)) 
@@ -91,16 +132,21 @@ def assign_nets(df, col_name):
     return list_res
 
 
-def arrange_df(df):
+def add_col(df):
+    """
+    Add columns to df: beta_abs, node1_networks, and node2_networks
+    """
+    #Add column of abs_beta
     df['beta_abs'] = np.abs(df.beta)
-    df_arranged = df.sort_values(by=['beta_abs'], ascending=False).head(50)
-    df_arranged = df_arranged.reset_index(drop=True)
-    
+    df_arranged = df
+
     #Create two extra columns of node1_nets and node2_nets
     df_arranged['node1_nets'] = assign_nets(df_arranged, 'node1')
     df_arranged['node2_nets'] = assign_nets(df_arranged, 'node2')
 
     return df_arranged
+
+
 
 def compare_edges(df_arranged, df_nodes):
     """
