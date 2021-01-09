@@ -148,10 +148,90 @@ def add_col(df):
 
 
 
-def compare_edges(df_arranged, df_nodes):
+def compare_edges(df_arranged, key1, key2):
     """
-    Find the common edges between 2 data frames of edges which predict tasks.
-    input: 2 data frames which contain node1, node2 and beta
+    Find the specific common edges between 2 data frames of edges which predict tasks.
+    input: a dict of 2 data frames each contain node1, node2 and beta, key1 (=name of the first df), key2 (=name of the second df)
     output: a list of common edges
     """
+    res = []
+    for i in range(df_arranged[key1].shape[0]):
+        #print(i)
+        node1_val = df_arranged[key1].loc[i]['node1']
+        node2_val = df_arranged[key1].loc[i]['node2']
+        #print(node1_val)
+        res_tmp = df_arranged[key2][(df_arranged[key2]['node1'] == node1_val) & (df_arranged[key2]['node2'] == node2_val)]
+        if res_tmp.shape[0] == 0:
+            res_tmp = df_arranged[key2][(df_arranged[key2]['node2'] == node1_val) & (df_arranged[key2]['node1'] == node2_val)]
+        if res_tmp.shape[0] == 0:
+            continue
+        res.append([node1_val, node2_val])
+
+    return res
+
+def common_netEdges_perRow(dataFrame1, index, df_name, df_names, dataFrame2):
+    """
+    Find the common net edges between 2 data frames of edges which predict tasks.
+    input: a dict of 2 data frames each contain node1, node2 and beta, key1 (=name of the first df), key2 (=name of the second df)
+    output: a list of common edges
+    """
+    res = []
+    node1_org = dataFrame1.loc[index]['node1']
+    node1_val = dataFrame1.loc[index]['node1_nets']
+    node2_org = dataFrame1.loc[index]['node2']
+    node2_val = dataFrame1.loc[index]['node2_nets']
     
+    res_tmp = dataFrame2[(dataFrame2['node1_nets'] == node1_val) & (dataFrame2['node2_nets'] == node2_val)]
+    if res_tmp.shape[0] == 0:
+        return None
+    
+    network_pair = "{0}-{1}".format(node1_val,node2_val)
+    if node1_val < node2_val:
+        network_pair = "{0}-{1}".format(node2_val,node1_val)
+    res = [node1_org, node2_org, network_pair]
+    
+    for name in df_names:
+        beta = "Empty"
+        if name == df_name:
+            beta = dataFrame1.loc[index]['beta']
+        if beta == "Empty":
+            res_tmp = dataFrame2[(dataFrame2['node1'] == node1_org) & (dataFrame2['node2'] == node2_org)]
+            if res_tmp.shape[0] == 1:
+                beta = res_tmp["beta"].values[0]
+        res.append(beta)
+    res.append(df_name)
+    return res
+    
+def find_common_netEdges(df_arr):
+    """
+    Find the common net edges between 2 data frames of edges which predict tasks.
+    input: a dict of 2 data frames each contain node1, node2 and beta, key1 (=name of the first df), key2 (=name of the second df)
+    output: a list of common edges
+    """
+    res = []
+    k_list = list(df_arr.keys())
+    if len(k_list) != 2:
+        print("We can compare only 2 assginments")
+        return None
+    if df_arr[k_list[0]].shape[0] != df_arr[k_list[1]].shape[0]:
+        print("The assignments are in diffrent size")
+        #return None
+    size = df_arr[k_list[0]].shape[0]
+    if size < df_arr[k_list[1]].shape[0]:
+        size = df_arr[k_list[1]].shape[0]
+
+    for i in range(size):
+        for k in [[0,1],[1,0]]:
+            res_tmp = None
+            if i < df_arr[k_list[k[0]]].shape[0]:
+                res_tmp = common_netEdges_perRow(df_arr[k_list[k[0]]], i, k_list[k[0]], k_list, df_arr[k_list[k[1]]])
+            if res_tmp is not None:
+                res.append(res_tmp)
+    df_res = pd.DataFrame(res, columns=["Node1", "Node2", "network_pair", "Beta({0})".format(k_list[0]), "Beta({0})".format(k_list[1]), "df_name"])
+    print(len(df_res))
+    df_res = df_res.drop_duplicates()
+    print(len(df_res))
+    df_res["count_pairNet_per_dfName"] = df_res.groupby(['network_pair', 'df_name'])['df_name'].transform('count')
+    df_res["count_pairNet"] = df_res.groupby(['network_pair'])['network_pair'].transform('count')
+    df_res = df_res.sort_values(by=['count_pairNet'], ascending=False,  ignore_index=True)
+    return df_res
