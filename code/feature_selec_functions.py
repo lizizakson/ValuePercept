@@ -108,7 +108,7 @@ def select_features(train_vcts, train_behav, percent = 0.01, corr_type='pearson'
 
     print(len(corr))
     #print(len(mask_dict))
-    return mask_edges
+    return mask_edges, corr
 
 
 
