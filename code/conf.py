@@ -25,8 +25,6 @@ BEHAVIOR_PATH = 'Behavior/HCP_behavior_includeZscores_V2.csv'
 RESULTS_DIR = '/mnt/c/Users/liz/Contacts/Desktop/ValuePercept/results/'
 
 #Paths for ROI analyses:
-## Value network paths:
-VALUE_MASK_PATH = BASE_DIR + 'ROI_analysis/1-s2.0-S1053811913002188-mmc2/nifti_masks/fig09/'
-vmPFC_mask_file = VALUE_MASK_PATH + 'binConjunc_PvNxDECxRECxMONxPRI_striatum.nii.gz'
-STR_mask_file = VALUE_MASK_PATH + 'binConjunc_PvNxDECxRECxMONxPRI_vmpfc.nii.gz'
+MASKS_PATH = 'ROI_analysis/masks/'
+
 

@@ -87,8 +87,7 @@ def plot_con_helper(df):
     
     node_names = list(df.node1) + list(df.node2)
     node_names = list(set(node_names))
-    con = df.R #for regression analysis
-    #con = df.beta #for model analysis
+    con = df.beta.to_numpy() #for model analysis
 
 
     i_1 = []
