@@ -44,7 +44,7 @@ def Pmaxelements(list1, P):
 
     """
     Helps in the feature selection step: 
-    input: a list of numbers (edges)
+    input: a list of numbers (edges), P = percent as a float (e.g. 0.01)
     output: the threshold (the minimum maximum) according to a specified percentage of highest values
     """
     
@@ -76,21 +76,31 @@ def select_features(train_vcts, train_behav, percent = 0.01, corr_type='pearson'
     assert train_vcts.index.equals(train_behav.index), "Row indices of FC vcts and behavior don't match!"
 
     # Correlate all edges with behav vector
+    
     if corr_type =='pearson':
         cov = np.dot(train_behav.T - train_behav.mean(), train_vcts - train_vcts.mean(axis=0)) / (train_behav.shape[0]-1)
-        corr = cov / np.sqrt(np.var(train_behav, ddof=1) * np.var(train_vcts, axis=0, ddof=1))
+        corr = cov / np.sqrt(np.var(train_behav, ddof=1) * np.var(train_vcts, axis=0, ddof=1)) #corr is of pandas series type
     elif corr_type =='spearman':
         corr = []
-        for edge in train_vcts.columns:
-            r_val = sp.stats.spearmanr(train_vcts.loc[:,edge], train_behav)[0]
-            corr.append(r_val)
+        for (columnName, columnData) in train_vcts.iteritems():
+            #print(columnData.values.shape)
+            corr.append(sp.stats.spearmanr(train_behav, columnData.values)[0]) #corr is of list type
+        corr = pd.Series(corr) #so I convert it to a pd series type
     
+    """ 
     # Correlate all edges with behav vector
-    #corr = []
-    #for (columnName, columnData) in train_vcts.iteritems():
-    #print(sc.stats.pearsonr(x, columnData.values)[0])
-     #   corr.append(sc.stats.pearsonr(train_behav, columnData.values)[0])  
-    #print(corr)
+    if corr_type =='pearson':
+        corr = []
+        for (columnName, columnData) in train_vcts.iteritems():
+        #print(sp.stats.pearsonr(x, columnData.values)[0])
+            corr.append(sp.stats.pearsonr(train_behav, columnData.values)[0])  
+        #print(corr)
+    elif corr_type =='spearman':
+        corr = []
+        for (columnName, columnData) in train_vcts.iteritems():
+        #print(sp.stats.pearsonr(x, columnData.values)[0])
+            corr.append(sp.stats.spearmanr(train_behav, columnData.values)[0]) 
+    """ 
     ##This code gives the same result as the code for the corr analysis above!
 
     # threshold of the X % highest values
@@ -98,18 +108,26 @@ def select_features(train_vcts, train_behav, percent = 0.01, corr_type='pearson'
     print(threshold)
 
     # define mask according to threshold
-    mask_edges = [] #create new list to store the indices of the highest elements from the original list in
-    #corr.abs() #convert the original list to abs values (not sorted)
+    mask_edges = [] #create new list to store the indices of the highest elements from the original list 
+    
     mask_edges = corr.abs() >= threshold
-    print(corr[mask_edges == True])
+    #print(corr[mask_edges == True])
+
 
     if verbose:
         print("Found ({}) edges positively/negatively correlated with behavior in the training set".format(len(mask_edges))) # for debugging
 
-    print(len(corr))
-    #print(len(mask_dict))
     return mask_edges, corr
 
-
+def arrange_selected_data(data, mask_dict, corr_type = "pearson"):
+    if corr_type == 'pearson':
+        data_selec = data[mask_dict.index[mask_dict]]
+        print("The X_train_selec (pearson) shape is {}".format(data_selec.shape))
+    elif corr_type == 'spearman':
+        #spearman corr - because the are no tupples as indices
+        mask_dict_list = mask_dict.index[mask_dict].to_list()
+        data_selec = data[data.columns[mask_dict_list]]
+        print("The X_train_selec (spearman) shape is {}".format(data_selec.shape))
+    return data_selec
 
 
