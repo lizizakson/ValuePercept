@@ -29,6 +29,10 @@ from numpy import arange
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RepeatedKFold
 from sklearn.linear_model import ElasticNet
+from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+import copy
 
 import hcp_utils as hcp
 import feature_selec_functions
@@ -38,41 +42,42 @@ import importlib
 import plots
 
 class Model:
-    def __init__(self, model_name, params_dict):
+    def __init__(self, model_name, params_dict, X_df, y_df):
         self.model_name = model_name
-        self.params_dict = params_dict
-        self.X_df = None
-        self.y_df = None
+        if params_dict is None:
+            self.fill_default_params() #need to write
+        else:
+            self.params_dict = params_dict
+        self.X_df = X_df
+        self.y_df = y_df
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        
 
     #Pre-process functions:
-    def preprocess(self, all_fc_data, behav):
-        """
-        Apply pre-processing to the x_data and y_data.
-        input: all_fc_data = a df of the x_features, behav = a pandas series of behavioral scores
-        output: a df of modified x_features according wanted params (fisher_z/scaled/both/none) and a df of modified y 
-        """
-        _prepare_X(all_fc_data)
-        _prepare_y(behav)
-
-    def _prepare_y(self, behav):
+    def _prepare_y(self):
         """
         Modifies the y according to the wanted params.
         Either none or saling.
         input: behav = a pandas series of behavioral scores
         output: y_df = a pandas series of modified behavioral scores
         """
-        self.y_df = behav.copy()
-        self.params_dict["y_preprocess_type"] == "z_score":
+        self.y_df = self.y_df.copy()
+        if self.params_dict["y_preprocess_type"] == "z_score":
             self.y_df = self.y_df.transform(lambda x: stats.zscore(x))
 
-    def _prepare_X(self, all_fc_data):
+        return self.y_df
+
+    def _prepare_X(self):
         """
         Modifies the x_features according to the wanted params.
         Either fisher-z transformation, or z-scoring, or both.
         input: all_fc_data = a df of the x_features, possible modifications ("fisher_z"/"z_score"/"both").
         output: X_df = a df of modified x_features according to the modify variable.
         """
-        self.X_df = all_fc_data.copy()
+        self.X_df = self.X_df.copy()
         if self.params_dict["X_preprocess_type"] == "fisher_z": #Fisher z_transform of x_features
             self.X_df = self.X_df.transform(lambda x: np.arctanh(x))
         elif self.params_dict["X_preprocess_type"] == "z_score": #scaling of x_features
@@ -81,7 +86,18 @@ class Model:
             self.X_df = self.X_df.transform(lambda x: np.arctanh(x))
             self.X_df = self.X_df.transform(lambda x: stats.zscore(x))
 
-        return
+        return self.X_df
+    
+    def preprocess(self):
+        """
+        Apply pre-processing to the x_data and y_data.
+        input: all_fc_data = a df of the x_features, behav = a pandas series of behavioral scores
+        output: a df of modified x_features according wanted params (fisher_z/scaled/both/none) and a df of modified y 
+        """
+        self.X_df = self._prepare_X()
+        self.y_df = self._prepare_y()
+
+    
 
     def get_x(self):
         return self.X_df.copy()
@@ -89,106 +105,147 @@ class Model:
     def set_x(self, other_df):
         self.X_df = other_df.copy()
 
-    def split_train_test(self):
+    def get_y(self):
+        return self.y_df.copy()
+
+    def set_y(self, other_df):
+        self.y_df = other_df.copy()
+
+    def split_train_test(self, dbg = False):
         """
         Splits the data into train and test datasets according to the test_size variable.
         Also shuffles the data.
         """
-        X_train, X_test, y_train, y_test = train_test_split(
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
                                                             self.X_df, # x
                                                             self.y_df, # y
-                                                            test_size = params_dict["test_size"], # e.g. 60%/40% split  
+                                                            test_size = self.params_dict["test_size"], # e.g. 60%/40% split  
                                                             shuffle = True, # shuffle dataset
                                                                             # before splitting
                                                             random_state = 0 # same shuffle each
                                                                             # time
                                                                             )
 
-        # print the size of our training and test groups
-        print('training:', len(X_train),
-            'testing:', len(X_test))
-        
-        #Examine the distributions of y_train and y_test
-        sns.distplot(y_train,label='train')
-        sns.distplot(y_test,label='test')
-        plt.legend()
+        if dbg:
+            # print the size of our training and test groups
+            print('training:', len(self.X_train),
+                'testing:', len(self.X_test))
+            
+            #Examine the distributions of y_train and y_test
+            sns.distplot(self.y_train,label='train')
+            sns.distplot(self.y_test,label='test')
+            plt.legend()
 
-        return X_train, X_test, y_train, y_test
-
-    def do_cv(self, nfolds = 5):
-        # bla bla
-        assert(0)
-        return
 
     #Fit functions:
-    def override_params(self):
+    def override_params_func(self, override_params):
+        """
+        Set parameters according to the requested model by adding the model parameters to params_dict.
+        """
         if override_params == None:
-            override_params = self.params_dict.copy()
+            override_params = copy.deepcopy(self.params_dict)
 
         for k in self.params_dict.keys():
             if k in override_params.keys():
                 continue
             override_params[k] = self.params_dict[k]
 
-    def fit(self, override_params = None):
-        # apply override_params
-        _select_features_uni(X_train) #select features
-        _select_features_multi(X_train)
-        _arrange_selected_data(data, mask_dict, corr_type = "pearson") #filter x_train according to the selected features
-        _optimized_cv(X_train, y_train)
+        return override_params
 
-    def _select_features_uni(X_train, y_train):
-        """
-        Runs the CPM feature selection step (univariate feature selection) which is written under feature_selec_functions: 
-        - correlates each edge with behavior, and returns a mask of the X% highest correlated edges (with behavior)
-
-        input: x features of train/test, y train/test (behavior), % of highest correlated edges, corr type
-        output: a mask of the X% highest correlated edges (with behavior)
-        """ 
-        importlib.reload(feature_selec_functions) #reload any changes in the code
-        mask_dict, corr = feature_selec_functions.select_features(X_train, y_train, percent = 0.05, corr_type='pearson', verbose=False)    
-        
-    def _arrange_selected_data(data, mask_dict, corr_type = "pearson"):
-        if corr_type == 'pearson':
-            X_train_selec = data[mask_dict.index[mask_dict]]
-            print("The X_train_selec (pearson) shape is {}".format(X_train_selec.shape))
-        elif corr_type == 'spearman':
-            #spearman corr - because the are no tupples as indices
-            mask_dict_list = mask_dict.index[mask_dict].to_list()
-            X_train_selec = data[data.columns[mask_dict_list]]
-            print("The X_train_selec (spearman) shape is {}".format(X_train_selec.shape))
-        return X_train_selec
-
-    def optimized_cv(X_train, y_train, model_type):
-        """
-        Runs a grid search to tune the hyper-parameters of the model.
-        input: X_train, y_train, model = either 'ElasticNet'/ 'SVR'/ 'RandomForest'
-        output: best score and best parameters
-        """
-        # define model evaluation method
-        cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-        # define grid
-        grid = dict()
-        if model_type == 'ElasticNet':
-            print("first if")
-            model = ElasticNet(l1_ratio = 0.01)
-            grid['alpha'] = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0, 100.0]
-        elif model_type == 'SVR':
-            model = SVR(kernel = 'linear')
-            grid['C'] = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0, 100.0]
-        elif model_type == 'RandomForest':
-            model = RandomForestRegressor()
-            grid['max_depth'] = range(3,7)
-            grid['n_estimators'] = (10, 50, 100, 1000)
+    def fit_model(self, select_features = True, override_params = None):
+        #print("Liz")
+        override_params = self.override_params_func(override_params)
+        print(override_params.keys())
+        #select features
+        if select_features:
+            importlib.reload(feature_selec_functions)
+            mask = np.ones(len(self.X_df.columns))
+            if override_params["params_selec"]["selection_method"] == "univariate": 
+                mask, corr = feature_selec_functions.select_features_uni(self.X_train, self.y_train, override_params["params_selec"]["percent"],
+                    override_params["params_selec"]["corr_type"], verbose=False)  
+            elif override_params["params_selec"]["selection_method"] == "multivariate": #need to write it
+                mask, corr = feature_selec_functions.select_features_multi(self.X_train, self.y_train, override_params) 
             
-        # define search
-        search = GridSearchCV(model, grid, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1)
+            #filter x_train according to the selected features
+            X_train_selec = feature_selec_functions.arrange_selected_data(self.X_train, mask, override_params["params_selec"]["corr_type"]) 
+            
+        #optimized cv
+        out_vals, best_param, best_err = self._optimized_cv(X_train_selec, self.y_train, override_params)
 
-        # perform the search
-        results = search.fit(X_train, y_train)
+        #fit to all the train data
+        final_model = best_param
+        final_model.fit(X_train_selec, self.y_train)
 
-        # summarize
-        print('MAE: %.3f' % results.best_score_)
-        print('Config: %s' % results.best_params_)
+        #predict on the x_test
+        ##filter the x_test features according to the mask_dict that was chosen for the x_train data
+        X_test_selec = feature_selec_functions.arrange_selected_data(self.X_test, mask, override_params["params_selec"]["corr_type"]) 
+
+        yhat = final_model.predict(X_test_selec)
+        if override_params["params_predict"]["eval_score"] == "mean_squared_error": #evluation score
+            final_model_score = [final_model, mean_squared_error(self.y_test, yhat)]
+
+        return final_model_score
+
+    def _inner_fit_fun(self, X, y, override_params):
+        fit_dict = override_params['params_fit']
+        models = []
+        if self.model_name == 'ElasticNet':
+            l1 = override_params['params_fit']['l1_ratio']
+            for a in override_params['params_fit']['alpha']:
+                print(a)
+                models.append(ElasticNet(l1_ratio=l1, alpha=a)) #models to fit
+                models[-1].fit(X=X, y=y)
+
+        return models
+
+    def _inner_eval_fun(self, X, y, models, override_params):
+        scores_and_params_list = []
+        if self.model_name == 'ElasticNet':
+            #fit_dict = override_params['params_fit']
+            for m in models:
+                #models.append(ElasticNet)
+                print(m)
+                yhat = m.predict(X=X) #predict yhat using x_eval
+                print(yhat)
+                #curr_params = {'l1_ratio': fit_dict["l1_ratio"][0], 'alpha': fit_dict["alpha"][i]}
+                if override_params["params_predict"]["eval_score"] == "mean_squared_error": #evluation score
+                    scores_and_params_list.append([m, mean_squared_error(y, yhat)])
+        return scores_and_params_list
+
+    def _optimized_cv(self, X, y, override_params, nfolds=2): 
+        """
+        Splits the data into nfolds datasets, fit the data to (nfolds-1)/nfolds of the data 
+        and then evaluate on the 1/nfold of the data.
+        Returns the best parameters according to the CV.
+        """
+        cv_id = np.arange(len(X))
+        out_vals = []
+        for i in range(nfolds):
+            ids_train = cv_id % nfolds != i #not equal to i
+            ids_eval = np.logical_not(ids_train) #take for evaluation the samples that were not used for training
+            print("starting fold {}".format(i))
+
+            mdls = self._inner_fit_fun(X.values[ids_train,:], y.values[ids_train], override_params)
+            #print(mdls)
+            out_vals.append(self._inner_eval_fun(X.values[ids_eval,:], y.values[ids_eval], mdls, override_params)) 
+            #list of len n-folds of list of len num_param_values of list of len 2 (model+score)
+            
+
+        # take the out_vals and calculate the best options
+        n_options = len(out_vals[0])
+        best_err = np.Inf
+        best_param = None
+        for i in range(n_options):
+            curr_option_err = 0 
+            for j in range(nfolds):
+                curr_option_err = out_vals[j][i][1]
+                if curr_option_err < best_err:
+                    best_err = curr_option_err
+                    best_param = out_vals[0][i][0] #doesn't matter from which n_fold I take the params because they are the same
         
-        return results, results.best_params_
+        #assert(not best_param) #validate that the best_params have been calculated = that they are not None
+
+        return out_vals, best_param, best_err 
+
+
+
