@@ -32,6 +32,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
+from mlxtend.evaluate import permutation_test
 import copy
 
 import hcp_utils as hcp
@@ -122,7 +123,7 @@ class Model:
                                                             test_size = self.params_dict["test_size"], # e.g. 60%/40% split  
                                                             shuffle = True, # shuffle dataset
                                                                             # before splitting
-                                                            random_state = 0 # same shuffle each
+                                                            random_state = 123 # same shuffle each
                                                                             # time
                                                                             )
 
@@ -175,16 +176,47 @@ class Model:
         #fit to all the train data
         final_model = best_param
         final_model.fit(X_train_selec, self.y_train)
-
+        
         #predict on the x_test
         ##filter the x_test features according to the mask_dict that was chosen for the x_train data
         X_test_selec = feature_selec_functions.arrange_selected_data(self.X_test, mask, override_params["params_selec"]["corr_type"]) 
 
         yhat = final_model.predict(X_test_selec)
         if override_params["params_predict"]["eval_score"] == "mean_squared_error": #evluation score
-            final_model_score = [final_model, mean_squared_error(self.y_test, yhat)]
+            final_model_score = [mean_squared_error(self.y_test, yhat)]
 
-        return final_model_score
+        return final_model, final_model_score, yhat
+
+    def plot_output(self,final_model, yhat):
+        x, y = self.y_test, yhat
+
+        fig_dims = (6, 4)
+        fig, ax = plt.subplots(figsize=fig_dims)
+
+        sns.set_style("ticks", {'axes.grid' : False})
+        sns.set_context("notebook", font_scale=1.5, rc={"lines.linewidth": 2.5})
+        sns.regplot(x, y, ax=ax, color = "#eb5e0b")
+        sns.despine()
+
+
+        plt.xlabel('Observed Values')
+        plt.ylabel('Predicted Values')
+        plt.text(max(x)-10, max(y), self.permutation_test(x,y), fontsize=12)
+
+        plt.show()
+
+
+    def permutation_test(self,x,y):
+        r_score = np.corrcoef(x, y)[1][0]
+
+
+        p_value = permutation_test(x, y,
+                                method='approximate', num_rounds=10000,
+                                func=lambda x, y: np.corrcoef(x, y)[1][0],
+                                seed=0)
+        
+        return round(r_score, 3), round(p_value, 4)
+
 
     def _inner_fit_fun(self, X, y, override_params):
         fit_dict = override_params['params_fit']
@@ -192,7 +224,7 @@ class Model:
         if self.model_name == 'ElasticNet':
             l1 = override_params['params_fit']['l1_ratio']
             for a in override_params['params_fit']['alpha']:
-                print(a)
+                #print(a)
                 models.append(ElasticNet(l1_ratio=l1, alpha=a)) #models to fit
                 models[-1].fit(X=X, y=y)
 
@@ -204,15 +236,15 @@ class Model:
             #fit_dict = override_params['params_fit']
             for m in models:
                 #models.append(ElasticNet)
-                print(m)
+                #print(m)
                 yhat = m.predict(X=X) #predict yhat using x_eval
-                print(yhat)
+                #print(yhat)
                 #curr_params = {'l1_ratio': fit_dict["l1_ratio"][0], 'alpha': fit_dict["alpha"][i]}
                 if override_params["params_predict"]["eval_score"] == "mean_squared_error": #evluation score
                     scores_and_params_list.append([m, mean_squared_error(y, yhat)])
         return scores_and_params_list
 
-    def _optimized_cv(self, X, y, override_params, nfolds=2): 
+    def _optimized_cv(self, X, y, override_params, nfolds=10): 
         """
         Splits the data into nfolds datasets, fit the data to (nfolds-1)/nfolds of the data 
         and then evaluate on the 1/nfold of the data.
