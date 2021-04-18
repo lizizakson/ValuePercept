@@ -50,7 +50,7 @@ def main():
     
     #pre-provessing
     params_dict = {'X_preprocess_type': 'fisher_z', 'y_preprocess_type': None, 'test_size': 0.2}
-    behav = df["DDisc_AUC_40K"] #send the behavioral score
+    behav = df["Flanker_AgeAdj"] #send the behavioral score
 
     reg_flanker = Model('ElasticNet', params_dict, all_fc_data, behav)
     reg_flanker.preprocess()
@@ -58,10 +58,13 @@ def main():
 
     #fit
     params_run = {'params_selec': {"selection_method": "univariate", "corr_type": "pearson", "percent": 0.05}, 
-                    'params_fit': {'l1_ratio': 0.01, 'alpha': [1e-2, 1e-1, 0.0, 1.0]},
+                    'params_fit': {'l1_ratio': 0.01, 'alpha': [1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0]},
                     'params_predict': {'eval_score': 'mean_squared_error', 'best_params': None}}
     
-    reg_flanker.fit_model(override_params = params_run)
+    final_model, final_model_score, yhat  = reg_flanker.fit_model(override_params = params_run)
+    print(final_model)
+    reg_flanker.plot_output(final_model, yhat)
+
 
 if __name__ == "__main__":
     main()
