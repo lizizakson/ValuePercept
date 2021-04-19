@@ -50,7 +50,8 @@ def main():
     
     #pre-provessing
     params_dict = {'X_preprocess_type': 'fisher_z', 'y_preprocess_type': None, 'test_size': 0.2}
-    behav = df["Flanker_AgeAdj"] #send the behavioral score
+    behav_name = "DDisc_AUC_40K"
+    behav = df[behav_name] #send the behavioral score: DDisc_AUC_40K, Flanker_AgeAdj, rank_compare
 
     reg_flanker = Model('ElasticNet', params_dict, all_fc_data, behav)
     reg_flanker.preprocess()
@@ -61,10 +62,34 @@ def main():
                     'params_fit': {'l1_ratio': 0.01, 'alpha': [1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0]},
                     'params_predict': {'eval_score': 'mean_squared_error', 'best_params': None}}
     
-    final_model, final_model_score, yhat  = reg_flanker.fit_model(override_params = params_run)
+    final_model, final_model_score, yhat, rel_features, rel_features_temp = reg_flanker.fit_model(override_params = params_run)
     print(final_model)
-    reg_flanker.plot_output(final_model, yhat)
 
+    #output
+    colors_dict = {'DDisc_AUC_40K': '#5eaaa8', 'Flanker_AgeAdj': "#eb5e0b", 'rank_compare': "#4a47a3", 'control_task': "#FF3659"}
+    parc_file_name = "Schaefer2018_100Parcels_7Networks_order_info.txt"
+    
+    reg_flanker.plot_output(yhat, colors_dict[behav_name]) #color according to the specific predicted task scores
+
+    save_name = behav_name + ".csv"
+    reg_flanker.save_rel_features(final_model, rel_features, parc_file_name, save_name)
+    reg_flanker.set_rel_features(rel_features_temp)
+    #print(reg_flanker.rel_features)
+
+    #cross_model
+    behav_name = "Flanker_AgeAdj"
+    behav = df[behav_name]
+    reg_DD = Model('ElasticNet', params_dict, all_fc_data, behav)
+    reg_DD.set_rel_features(reg_flanker.rel_features)
+    reg_DD.preprocess()
+    reg_DD.split_train_test(dbg = False)
+    #fit
+    params_run = {'params_fit': {'l1_ratio': 0.01, 'alpha': [1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0]},
+                    'params_predict': {'eval_score': 'mean_squared_error', 'best_params': None}}
+    
+    final_model, final_model_score, yhat = reg_DD.fit_model(override_params = params_run, select_features = False)
+    print(final_model)
+    reg_DD.plot_output(yhat, colors_dict[behav_name])
 
 if __name__ == "__main__":
     main()
