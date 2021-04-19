@@ -55,6 +55,7 @@ class Model:
         self.X_test = None
         self.y_train = None
         self.y_test = None
+        self.rel_features = None
         
 
     #Pre-process functions:
@@ -154,11 +155,15 @@ class Model:
         return override_params
 
     def fit_model(self, select_features = True, override_params = None):
-        #print("Liz")
+        """
+        fit a model to the train data using cross-validation. Evaluate the model on the test data.
+        input: x_train, y_train, override_params
+        output: final model, score of the final model, yhat predicted by the final model
+        """
         override_params = self.override_params_func(override_params)
         print(override_params.keys())
         #select features
-        if select_features:
+        if select_features and self.rel_features == None:
             importlib.reload(feature_selec_functions)
             mask = np.ones(len(self.X_df.columns))
             if override_params["params_selec"]["selection_method"] == "univariate": 
@@ -169,7 +174,15 @@ class Model:
             
             #filter x_train according to the selected features
             X_train_selec = feature_selec_functions.arrange_selected_data(self.X_train, mask, override_params["params_selec"]["corr_type"]) 
-            
+            rel_features_temp =  X_train_selec.columns
+            #convert from strings to tuples
+            rel_features = []
+            for i in rel_features_temp:
+                rel_features.append(eval(i))
+            #print(rel_features)
+        else: #rel_features is not none
+           X_train_selec = self.X_train[self.rel_features] 
+
         #optimized cv
         out_vals, best_param, best_err = self._optimized_cv(X_train_selec, self.y_train, override_params)
 
@@ -179,15 +192,62 @@ class Model:
         
         #predict on the x_test
         ##filter the x_test features according to the mask_dict that was chosen for the x_train data
-        X_test_selec = feature_selec_functions.arrange_selected_data(self.X_test, mask, override_params["params_selec"]["corr_type"]) 
+        if select_features and self.rel_features == None:
+            X_test_selec = feature_selec_functions.arrange_selected_data(self.X_test, mask, override_params["params_selec"]["corr_type"]) 
+        else:
+            X_test_selec = self.X_test[self.rel_features]
 
         yhat = final_model.predict(X_test_selec)
         if override_params["params_predict"]["eval_score"] == "mean_squared_error": #evluation score
             final_model_score = [mean_squared_error(self.y_test, yhat)]
 
-        return final_model, final_model_score, yhat
+        if select_features and self.rel_features == None:
+            return final_model, final_model_score, yhat, rel_features, rel_features_temp
+        else:
+            return final_model, final_model_score, yhat
 
-    def plot_output(self,final_model, yhat):
+    def set_rel_features(self,rel_features_temp):
+        self.rel_features = rel_features_temp
+
+    def save_rel_features(self, final_model, rel_features, parc_file_name, save_name):
+        #model coefs
+        relevant_coefs = final_model.coef_  #elastic net
+        
+        #load parc_file
+        with open(parc_file_name, 'r') as f:
+            lines = f.readlines()
+
+        #list of parcels
+        list_parcel = []
+        for i in range(0, len(lines), 2): #only even rows
+            list_parcel.append(lines[i][10:-1])
+        print(len(list_parcel))
+
+        #create a list of dictionaries which identifies each relevant pair of nodes and attach its beta
+        res = []
+        for i in range(len(rel_features)):
+            dict_res = {}
+            tup = rel_features[i] #tupple(pair of nodes)
+            parcel_index = tup[0] #tupples and list_parcels are listed from zero
+            dict_res["node1"] = list_parcel[parcel_index]
+            parcel_index = tup[1]
+            dict_res["node2"] = list_parcel[parcel_index]
+            dict_res["beta"] = relevant_coefs[i]
+            res.append(dict_res)
+        
+        df_res = pd.DataFrame(res)
+        #Add the relevant features (in numbers) to the df_res
+        df_res["rel_edges"] = rel_features
+        #save df_res
+        df_res.to_csv(save_name)
+        
+    def plot_output(self, yhat, col):
+        """
+        Plot a scatter plot of the observed ytest and the predicted yhat.
+        Adds an r2_score and a p value according to a permutation score.
+        input: yhat predicted by the final model, color for the plot
+        output: a scatter plot of the observed ytest and the predicted yhat
+        """
         x, y = self.y_test, yhat
 
         fig_dims = (6, 4)
@@ -195,18 +255,19 @@ class Model:
 
         sns.set_style("ticks", {'axes.grid' : False})
         sns.set_context("notebook", font_scale=1.5, rc={"lines.linewidth": 2.5})
-        sns.regplot(x, y, ax=ax, color = "#eb5e0b")
+        sns.regplot(x, y, ax=ax, color = col)
         sns.despine()
 
 
         plt.xlabel('Observed Values')
         plt.ylabel('Predicted Values')
-        plt.text(max(x)-10, max(y), self.permutation_test(x,y), fontsize=12)
+        #show results of permutation test
+        plt.text(max(x)-max(x)*0.05, max(y), self._permutation_test(x,y), fontsize=12)
 
         plt.show()
 
 
-    def permutation_test(self,x,y):
+    def _permutation_test(self,x,y):
         r_score = np.corrcoef(x, y)[1][0]
 
 
