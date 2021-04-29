@@ -35,6 +35,11 @@ import feature_selec_functions
 import importlib
 
 def conv_to_tuple(temp_list):
+    """
+    Convert a list of tuples that are displayed as strings to a list of tuples.
+    input: a list of strings
+    output: a list of tuples
+    """
     list_of_tups = []
     for i in temp_list:
         list_of_tups.append(eval(i))
@@ -81,6 +86,54 @@ def add_node_names(df, node_names):
     df_with_node_names = pd.merge(df, node_names, on = left_index, left_index = True, right_index = True)
     return df_with_node_names
     
+def create_heatmap_modeBeta(df, val_col, val1, val2):
+    #define variables
+    node1_nets = df[val1].unique()
+    node2_nets = df[val2].unique()
+    ser = df[val_col]
+    if val_col == "beta_abs" or val_col == "beta":
+        num = ser.to_numpy(dtype = 'float')
+    else:
+        num = ser.to_numpy(dtype = 'int')
+    num = np.reshape(num, (len(node1_nets), len(node2_nets)))
+
+    #draw heatmap
+    fig, ax = plt.subplots()
+    im = ax.imshow(num)
+
+    # show all ticks...
+    #ax.set_xticks(np.arange(len(node1_nets)))
+    #ax.set_yticks(np.arange(len(node2_nets)))
+
+    if val_col == "percent_mode": #display from 50
+        p = sns.heatmap(num, xticklabels=node1_nets, yticklabels=node2_nets, vmin=50,vmax=100,center=75, 
+                    cmap='Reds', annot=True,  linewidths=.5, fmt="d")
+    elif val_col == "beta_abs":
+        #print("Liz")
+        p = sns.heatmap(num, xticklabels=node1_nets, yticklabels=node2_nets,
+                    cmap='Reds', annot=True,  linewidths=.5, fmt=".3f")
     
+    elif val_col == "beta":
+        #print("Liz")
+        p = sns.heatmap(num, xticklabels=node1_nets, yticklabels=node2_nets, center=0,
+                    cmap='coolwarm', annot=True,  linewidths=.5, fmt=".3f")
+
+    else: #display normaly
+        p = sns.heatmap(num, xticklabels=node1_nets, yticklabels=node2_nets, 
+                    cmap='Reds', annot=True,  linewidths=.5, fmt="d")
+    
+    p.tick_params(left=False, bottom=False) 
+    p.set_facecolor('black')
+
+   
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+            rotation_mode="anchor")
+
+    #ax.set_title("Harvest of local farmers (in tons/year)")
+    #fig.tight_layout()
+    plt.show()
+
+
 
 
