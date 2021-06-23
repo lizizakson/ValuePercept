@@ -43,7 +43,7 @@ import importlib
 import plots
 
 class Model:
-    def __init__(self, model_name, params_dict, X_df, y_df):
+    def __init__(self, model_name, params_dict, X_df, y_df, y_df_restricted):
         self.model_name = model_name
         if params_dict is None:
             self.fill_default_params() #need to write
@@ -51,6 +51,7 @@ class Model:
             self.params_dict = params_dict
         self.X_df = X_df
         self.y_df = y_df
+        self.y_df_restricted = y_df_restricted
         self.X_train = None
         self.X_test = None
         self.y_train = None
@@ -138,6 +139,48 @@ class Model:
             sns.distplot(self.y_test,label='test')
             plt.legend()
 
+
+    
+    def split_train_test_fam(self, dbg = True):
+        """
+        Splits the data into train and test datasets according to family ID.
+        Also shuffles the data.
+        """
+        is_train_list = self._arrange_data_according_fam()
+        self.y_df_restricted["is_train"] = is_train_list
+        #self.X_df["is_train"] = is_train_list
+
+        self.X_train = self.X_df[self.y_df_restricted['is_train']== 1]
+        self.X_test = self.X_df[self.y_df_restricted['is_train'] == 0]
+        self.y_train = self.y_df[self.y_df_restricted['is_train'] == 1]
+        self.y_test = self.y_df[self.y_df_restricted['is_train'] == 0]
+
+        if dbg:
+            # print the size of our training and test groups
+            print('training:', len(self.X_train),
+                'testing:', len(self.X_test))
+            
+            #Examine the distributions of y_train and y_test
+            sns.distplot(self.y_train,label='train')
+            sns.distplot(self.y_test,label='test')
+            plt.legend()
+
+    def _is_train(self, x, list_fam):
+        if x["Family_ID"] in list_fam:
+            return 1
+        return 0
+    
+    def _arrange_data_according_fam(self):
+        #group by family_ID
+        df_fam_count = self.y_df_restricted.groupby(["Family_ID"]).count().reset_index()[["Family_ID"]]
+        #split the df of family names into 80/20 randomly
+        train_fam = df_fam_count.sample(frac=0.8,random_state=1)
+        test_fam = df_fam_count.drop(train_fam.index)
+        train_fam = list(train_fam.Family_ID)
+        test_fam = list(test_fam.Family_ID)
+        self.y_df_restricted["is_train"] = self.y_df_restricted.apply(lambda row: self._is_train(row, train_fam), axis = 1)
+        is_train_list = list(self.y_df_restricted["is_train"])
+        return is_train_list
 
     #Fit functions:
     def override_params_func(self, override_params):
@@ -280,14 +323,21 @@ class Model:
 
 
     def _inner_fit_fun(self, X, y, override_params):
-        fit_dict = override_params['params_fit']
+        #fit_dict = override_params['params_fit']
         models = []
         if self.model_name == 'ElasticNet':
-            l1 = override_params['params_fit']['l1_ratio']
-            for a in override_params['params_fit']['alpha']:
-                #print(a)
-                models.append(ElasticNet(l1_ratio=l1, alpha=a)) #models to fit
-                models[-1].fit(X=X, y=y)
+            if len(override_params['params_fit']['l1_ratio']) == 1: #fixed l1_ratio
+                l1 = override_params['params_fit']['l1_ratio'][0]
+                for a in override_params['params_fit']['alpha']:
+                    #print(a)
+                    models.append(ElasticNet(l1_ratio=l1, alpha=a)) #models to fit
+                    models[-1].fit(X=X, y=y)
+            else: #several l1_ratios
+                for l1 in override_params['params_fit']['l1_ratio']:
+                    for a in override_params['params_fit']['alpha']:
+                        #print(a)
+                        models.append(ElasticNet(l1_ratio=l1, alpha=a)) #models to fit
+                        models[-1].fit(X=X, y=y)
 
         return models
 
