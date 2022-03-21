@@ -35,3 +35,18 @@ Initial code for a CPM model- connectome predictive modeling.<br />
 •	Define CPM functions:<br />
 o	Cross validation – working on a leave-one-out instead of k-fold<br />
 o	Split train, test<br />
+
+### main_model_running.py
+An object-oriented code to run the whole pipline (class Model):
+-Loading both the functional connectivity data (x) and the behavioral data (y)
+- Pre-processing of the functional connectivity data (fisher transformation/z-score/both)
+- Split the data into train and test
+- Fit model: 
+-- For regression models: feature selection method and then regularized regression
+- Cross-validation to choose the best performing model
+- plot output (predicted vs. oserved data)
+
+### model_function.py
+The functions class Model is using to run the pipeline.
+* Also added a possibility to run the pipeline according to family train-test split (family members would be in the same group) and not random split.
+- 
